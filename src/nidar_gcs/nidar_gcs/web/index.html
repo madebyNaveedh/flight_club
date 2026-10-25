@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NIDAR AirMouse | Autonomous GCS & Mission Planner</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #090d16;
+      --card-bg: rgba(18, 24, 38, 0.75);
+      --card-border: rgba(255, 255, 255, 0.08);
+      --accent: #00f0ff;
+      --accent-glow: rgba(0, 240, 255, 0.35);
+      --green: #10b981;
+      --orange: #f59e0b;
+      --red: #ef4444;
+      --text-main: #f1f5f9;
+      --text-muted: #94a3b8;
+    }
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    }
+    body {
+      background: radial-gradient(circle at 50% 0%, #151e33 0%, var(--bg) 80%);
+      color: var(--text-main);
+      height: 100vh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+    header {
+      background: rgba(13, 18, 29, 0.9);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--card-border);
+      padding: 12px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      z-index: 100;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+    .badge-track {
+      background: rgba(0, 240, 255, 0.12);
+      color: var(--accent);
+      border: 1px solid rgba(0, 240, 255, 0.3);
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+    .title {
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+    .header-stats {
+      display: flex;
+      gap: 20px;
+      align-items: center;
+    }
+    .stat-pill {
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid var(--card-border);
+      padding: 6px 14px;
+      border-radius: 20px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+    }
+    .score-badge {
+      background: linear-gradient(135deg, rgba(16, 185, 129, 0.2), rgba(0, 240, 255, 0.2));
+      border: 1px solid rgba(16, 185, 129, 0.5);
+      color: #34d399;
+      font-weight: 700;
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .main-grid {
+      flex: 1;
+      display: grid;
+      grid-template-columns: 1fr 420px;
+      gap: 16px;
+      padding: 16px;
+      height: calc(100vh - 65px);
+    }
+    .panel {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      backdrop-filter: blur(16px);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+    }
+    .panel-header {
+      padding: 12px 16px;
+      background: rgba(255, 255, 255, 0.02);
+      border-bottom: 1px solid var(--card-border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-weight: 600;
+      font-size: 13px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .panel-body {
+      flex: 1;
+      position: relative;
+      overflow: hidden;
+    }
+    #map-canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+    .map-overlay-info {
+      position: absolute;
+      top: 12px;
+      left: 12px;
+      background: rgba(11, 15, 25, 0.85);
+      backdrop-filter: blur(8px);
+      border: 1px solid var(--card-border);
+      padding: 8px 12px;
+      border-radius: 8px;
+      font-size: 11px;
+      font-family: 'JetBrains Mono', monospace;
+      color: #94a3b8;
+      pointer-events: none;
+    }
+    .right-sidebar {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      height: 100%;
+    }
+    .camera-card {
+      height: 280px;
+    }
+    .camera-stream {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      background: #060910;
+    }
+    .survivors-card {
+      flex: 1;
+      overflow-y: auto;
+    }
+    .survivor-list {
+      padding: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .survivor-row {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      padding: 10px 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      transition: all 0.2s;
+    }
+    .survivor-row.confirmed {
+      border-color: rgba(16, 185, 129, 0.5);
+      background: rgba(16, 185, 129, 0.05);
+    }
+    .s-id {
+      font-weight: 700;
+      font-size: 14px;
+      color: var(--accent);
+    }
+    .s-grid {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      background: rgba(0, 240, 255, 0.1);
+      padding: 2px 6px;
+      border-radius: 4px;
+      color: var(--accent);
+    }
+    .telemetry-bar {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      padding: 12px;
+      border-top: 1px solid var(--card-border);
+      background: rgba(0, 0, 0, 0.2);
+    }
+    .telem-item {
+      text-align: center;
+    }
+    .telem-label {
+      font-size: 10px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+    }
+    .telem-val {
+      font-size: 14px;
+      font-weight: 700;
+      font-family: 'JetBrains Mono', monospace;
+      color: var(--text-main);
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <span class="badge-track">NIDAR AirMouse</span>
+      <h1 class="title">Autonomous Search, Mapping & Survivor Localiser</h1>
+    </div>
+    <div class="header-stats">
+      <div class="stat-pill score-badge" id="hud-score">
+        Score: 0 / 600
+      </div>
+      <div class="stat-pill">
+        <span>⏱️ Flight Time:</span>
+        <strong id="hud-timer" style="font-family: 'JetBrains Mono';">00:00</strong>
+      </div>
+      <div class="stat-pill" style="background: rgba(0, 240, 255, 0.08); border-color: rgba(0, 240, 255, 0.3);">
+        <span style="color: var(--accent);">⚡</span>
+        <span>Autonomy: <strong id="hud-autonomy" style="color: var(--accent); font-family: 'JetBrains Mono';">STANDBY</strong></span>
+      </div>
+      <div class="stat-pill">
+        <span style="color: var(--green);">●</span>
+        <span>Local DDS: <strong>ACTIVE</strong></span>
+      </div>
+    </div>
+  </header>
+
+  <div class="main-grid">
+    <!-- 2D 15x15m SLAM Grid & Survivor Map -->
+    <div class="panel">
+      <div class="panel-header">
+        <span>2D Indoor Arena Grid Map (15m x 15m)</span>
+        <span style="font-size: 11px; color: var(--accent);">GPS-Denied SLAM Mode</span>
+      </div>
+      <div class="panel-body">
+        <canvas id="map-canvas"></canvas>
+        <div class="map-overlay-info">
+          <div>Grid Size: 15 x 15 cells (1m x 1m each)</div>
+          <div>Entry / Exit: [0, 1]</div>
+          <div>Drone Pose: <span id="telem-pose">(0.6, 1.0)</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right Column: Live Feed & Survivor Tags -->
+    <div class="right-sidebar">
+      <!-- Live Video Feed -->
+      <div class="panel camera-card">
+        <div class="panel-header">
+          <span>Live Camera Feed & YOLOv8 HUD</span>
+          <span style="font-size: 11px; color: var(--green);">1080p @ 30 FPS</span>
+        </div>
+        <div class="panel-body">
+          <img id="live-stream" class="camera-stream" src="/camera_frame" alt="Live Drone Camera Feed">
+        </div>
+      </div>
+
+      <!-- Survivors Detected List -->
+      <div class="panel survivors-card">
+        <div class="panel-header">
+          <span>Tagged Survivors (<span id="survivor-count">0</span>/6)</span>
+          <span style="font-size: 11px; color: var(--orange);">Max 240 Pts</span>
+        </div>
+        <div class="panel-body">
+          <div class="survivor-list" id="survivor-list-container">
+            <div style="text-align: center; color: var(--text-muted); font-size: 12px; margin-top: 30px;">
+              Searching maze corridors... No survivors tagged yet.
+            </div>
+          </div>
+        </div>
+
+        <div class="telemetry-bar">
+          <div class="telem-item">
+            <div class="telem-label">Altitude</div>
+            <div class="telem-val" id="telem-alt">0.8 m</div>
+          </div>
+          <div class="telem-item">
+            <div class="telem-label">2D Map Explored</div>
+            <div class="telem-val" id="telem-map">0 %</div>
+          </div>
+          <div class="telem-item">
+            <div class="telem-label">Exit Status</div>
+            <div class="telem-val" id="telem-exit" style="color: var(--orange);">INSIDE</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const canvas = document.getElementById('map-canvas');
+    const ctx = canvas.getContext('2d');
+    let state = {
+      drone: { x: 0.6, y: 1.0, z: 0.8, yaw: 0.0 },
+      trajectory: [],
+      survivors: [],
+      score: { score: 0, max: 600 },
+      flightTime: 0,
+      mapExploredPct: 0
+    };
+
+    function resizeCanvas() {
+      canvas.width = canvas.parentElement.clientWidth;
+      canvas.height = canvas.parentElement.clientHeight;
+      drawMap();
+    }
+    window.addEventListener('resize', resizeCanvas);
+
+    function drawMap() {
+      const W = canvas.width;
+      const H = canvas.height;
+      ctx.clearRect(0, 0, W, H);
+
+      const margin = 35;
+      const arenaPixels = Math.min(W - 2 * margin, H - 2 * margin);
+      const originX = (W - arenaPixels) / 2;
+      const originY = (H - arenaPixels) / 2;
+      const cellSize = arenaPixels / 15.0;
+
+      // Draw Grid Background
+      ctx.fillStyle = '#0f172a';
+      ctx.fillRect(originX, originY, arenaPixels, arenaPixels);
+
+      // Draw 15x15 Grid Cells
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.07)';
+      ctx.lineWidth = 1;
+      for (let i = 0; i <= 15; i++) {
+        // Vertical lines
+        ctx.beginPath();
+        ctx.moveTo(originX + i * cellSize, originY);
+        ctx.lineTo(originX + i * cellSize, originY + arenaPixels);
+        ctx.stroke();
+
+        // Horizontal lines
+        ctx.beginPath();
+        ctx.moveTo(originX, originY + i * cellSize);
+        ctx.lineTo(originX + arenaPixels, originY + i * cellSize);
+        ctx.stroke();
+      }
+
+      // Draw Grid Axis Labels (0 to 14)
+      ctx.fillStyle = '#64748b';
+      ctx.font = '10px JetBrains Mono';
+      for (let i = 0; i < 15; i++) {
+        ctx.fillText(i, originX + i * cellSize + cellSize / 2 - 3, originY - 10);
+        ctx.fillText(i, originX - 22, originY + (14 - i) * cellSize + cellSize / 2 + 4);
+      }
+
+      // Draw 2ft x 2ft Launch Zone at [0, 1]
+      const lPadX = originX + 0.6 * cellSize;
+      const lPadY = originY + (15 - 1.0) * cellSize;
+      ctx.fillStyle = 'rgba(245, 158, 11, 0.25)';
+      ctx.fillRect(originX, originY + (15 - 2) * cellSize, cellSize, cellSize);
+      ctx.strokeStyle = '#f59e0b';
+      ctx.strokeRect(originX, originY + (15 - 2) * cellSize, cellSize, cellSize);
+      ctx.fillStyle = '#f59e0b';
+      ctx.fillText('ENTRY/EXIT', originX + 4, originY + (15 - 1) * cellSize - 4);
+
+      // Draw Flight Path Trajectory
+      if (state.trajectory.length > 1) {
+        ctx.strokeStyle = 'rgba(0, 240, 255, 0.4)';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        for (let i = 0; i < state.trajectory.length; i++) {
+          const pt = state.trajectory[i];
+          const px = originX + pt.x * cellSize;
+          const py = originY + (15 - pt.y) * cellSize;
+          if (i === 0) ctx.moveTo(px, py);
+          else ctx.lineTo(px, py);
+        }
+        ctx.stroke();
+      }
+
+      // Draw Tagged Survivors
+      state.survivors.forEach(s => {
+        const sx = originX + s.world_position[0] * cellSize;
+        const sy = originY + (15 - s.world_position[1]) * cellSize;
+
+        // Glowing circle
+        ctx.fillStyle = s.confirmed ? 'rgba(16, 185, 129, 0.3)' : 'rgba(245, 158, 11, 0.3)';
+        ctx.beginPath();
+        ctx.arc(sx, sy, cellSize * 0.45, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = s.confirmed ? '#10b981' : '#f59e0b';
+        ctx.beginPath();
+        ctx.arc(sx, sy, 7, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Label
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 11px Inter';
+        ctx.fillText(`S#${s.id} [${s.grid_coordinate[0]},${s.grid_coordinate[1]}]`, sx + 10, sy + 4);
+      });
+
+      // Draw Drone Position & Heading
+      const dx = originX + state.drone.x * cellSize;
+      const dy = originY + (15 - state.drone.y) * cellSize;
+
+      ctx.save();
+      ctx.translate(dx, dy);
+      ctx.rotate(-state.drone.yaw);
+
+      // Drone Body
+      ctx.fillStyle = '#00f0ff';
+      ctx.beginPath();
+      ctx.arc(0, 0, 8, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Heading Arrow
+      ctx.strokeStyle = '#00f0ff';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.lineTo(16, 0);
+      ctx.stroke();
+
+      ctx.restore();
+    }
+
+    // Polling API for Live GCS Telemetry
+    async function updateGCS() {
+      try {
+        const res = await fetch('/api/state');
+        if (res.ok) {
+          const data = await res.json();
+          if (data.drone_pose) {
+            state.drone = data.drone_pose;
+            state.trajectory.push({ x: data.drone_pose.x, y: data.drone_pose.y });
+            if (state.trajectory.length > 500) state.trajectory.shift();
+            document.getElementById('telem-pose').innerText = `(${data.drone_pose.x.toFixed(1)}, ${data.drone_pose.y.toFixed(1)})`;
+            document.getElementById('telem-alt').innerText = `${data.drone_pose.z.toFixed(2)} m`;
+          }
+
+          if (data.survivors) {
+            state.survivors = data.survivors;
+            document.getElementById('survivor-count').innerText = data.survivors.length;
+            renderSurvivorList(data.survivors);
+          }
+
+          if (data.mission_state) {
+            const st = data.mission_state.state;
+            document.getElementById('hud-autonomy').innerText = st;
+            if (st === 'COMPLETED') {
+              document.getElementById('hud-autonomy').style.color = 'var(--green)';
+            }
+          }
+
+          if (data.score_report) {
+            const sc = data.score_report.scores.total_flight_score;
+            document.getElementById('hud-score').innerText = `Score: ${sc.score.toFixed(0)} / 600`;
+            const mapAcc = data.score_report.scores.grid_mapping_accuracy.score / 220.0 * 100;
+            document.getElementById('telem-map').innerText = `${mapAcc.toFixed(0)} %`;
+            
+            const mins = Math.floor(data.score_report.mission_time_sec / 60);
+            const secs = Math.floor(data.score_report.mission_time_sec % 60);
+            document.getElementById('hud-timer').innerText = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+
+            if (data.score_report.exited_successfully) {
+              const el = document.getElementById('telem-exit');
+              el.innerText = 'EXITED';
+              el.style.color = 'var(--green)';
+            }
+          }
+          drawMap();
+        }
+      } catch (e) {
+        // Offline / waiting
+      }
+    }
+
+    function renderSurvivorList(survivors) {
+      const container = document.getElementById('survivor-list-container');
+      if (!survivors || survivors.length === 0) {
+        container.innerHTML = '<div style="text-align: center; color: var(--text-muted); font-size: 12px; margin-top: 30px;">Searching maze corridors... No survivors tagged yet.</div>';
+        return;
+      }
+      container.innerHTML = survivors.map(s => `
+        <div class="survivor-row ${s.confirmed ? 'confirmed' : ''}">
+          <div>
+            <div class="s-id">Survivor #${s.id}</div>
+            <div style="font-size: 11px; color: var(--text-muted);">Pos: (${s.world_position[0]}, ${s.world_position[1]}) | Conf: ${(s.confidence*100).toFixed(0)}%</div>
+          </div>
+          <div class="s-grid">Grid: [${s.grid_coordinate[0]}, ${s.grid_coordinate[1]}]</div>
+        </div>
+      `).join('');
+    }
+
+    
+    // Native High-Performance MJPEG Hardware-Accelerated Streamer (30 FPS)
+    const streamImg = document.getElementById('live-stream');
+    streamImg.src = '/video_feed';
+    streamImg.onerror = () => {
+      setTimeout(() => { streamImg.src = '/video_feed?t=' + Date.now(); }, 1000);
+    };
+
+    resizeCanvas();
+    setInterval(updateGCS, 250);
+  </script>
+</body>
+</html>
